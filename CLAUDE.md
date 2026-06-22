@@ -1,0 +1,73 @@
+# Skill Analyzer — Project Context
+
+Static security analyzer for AI agent instruction artifacts (`SKILL.md`, `AGENTS.md`,
+`CLAUDE.md`). Detects prompt injection, command execution, data exfiltration, excessive
+permissions, obfuscation and supply-chain risk; returns a `ScanReport` (JSON + SARIF) with a
+`CLEAN / CAUTION / DO_NOT_INSTALL` verdict.
+
+## Status
+
+- **Built (this session): engine package `src/analyzer/` — milestones M1–M6 + eval harness.**
+- **Deferred: M7 (FastAPI + React/Vite/Tailwind/shadcn SPA via Bun, openapi→types pipeline) and
+  M8 (multi-stage Dockerfile + Dokku deploy).**
+
+## Stack
+
+- Python 3.12, `uv`. Pure library — **no web/HTTP imports inside `analyzer/`** (kept decoupled
+  for isolated testing and a future thin FastAPI wrapper).
+- Deps: `pydantic`, `pyyaml`, `google-re2` (ReDoS-safe regex), `bashlex`, `httpx`, `litellm`,
+  `yara-python`. Dev: `pytest`, `pytest-asyncio`, `pytest-timeout`.
+- Package is `analyzer` (src-layout); configured via `[tool.uv.build-backend] module-name`.
+
+## Architecture
+
+Entry point is a pure function: `analyze(bundle, config) -> ScanReport` (`analyze.py`).
+Pipeline: ingest → discover (artifact kind → profile) → static rules → manifest →
+AST/dataflow → obfuscation → supply-chain/OSV → judge panel → score/verdict/dedupe → render.
+
+### Non-negotiable invariants (§6 of the spec)
+1. **Never executes submitted content.** All layers are static (AST parse, regex, decode).
+2. **Channel separation** (`judges/panel.py`): artifact content reaches judges only inside a
+   nonce-fenced user-role data block; the hardened instructions live in the system role. Fence
+   delimiter chars (`⟦⟧`) are stripped from content so it can't forge a closing fence.
+3. **Additive-only judges**: `aggregate()` only emits findings — no path clears a finding or
+   lowers a verdict. A jailbroken/abstaining judge can never suppress other findings.
+4. **documents-vs-performs** (§7): the tool passes its own scan (`test_self_scan.py`).
+
+## Key design decisions (and why)
+
+- **re2, not Python `re`**: linear-time matching is how we satisfy ReDoS-safety without per-rule
+  timeouts. **re2 has no lookahead/lookbehind/backreferences** — corpus patterns must avoid them.
+- **Rule corpus is data** (`rules/corpus/*.yaml`), multilingual (en/uk/ru). Each rule declares
+  `surfaces` (body/reference/script…), `kinds` (skill/agents/claude_md), `escalate_for_claude_md`
+  (always-on weighting), and `negatable` (negation-aware documents-vs-performs downgrade).
+- **Profile isolation**: structural skill-manifest vectors (`Bash(*)`, `` !`…` ``, `$ARGUMENTS`,
+  `model:`) live in `layers/manifest.py` and only run for skill/agents — they can never fire on a
+  CLAUDE.md. CLAUDE.md gets standing-instruction rules (escalated) + `@import` poisoning findings.
+- **Instruction-body NL scanning only on markdown artifacts** (`discovery.primary_is_doc()`): a
+  code file (e.g. a self-scan of `prompt.py`, which *documents* attack strings) is a script
+  surface, never an instruction body — this is what keeps the self-scan CLEAN.
+- **Taint = env-source → network-sink only.** Generic file reads were dropped from the trigger;
+  they caused false positives on benign read-then-POST code (precision > recall, per the spec).
+- **Judges are dependency-injected** and gated behind `JUDGE_LIVE=1`. Tests use `judges/fake.py`
+  (deterministic) — security properties are provable without a live LLM. Real dispatch
+  (`judges/client.py`, LiteLLM→OpenRouter) abstains on any error or unparseable output.
+- **OSV is injected** into `analyze(..., osv_query=...)` so tests stay offline; offline degrades
+  to an Info note.
+
+## Commands
+
+```bash
+uv run pytest                      # full suite (128 tests)
+uvx pyright src tests              # type check (use this, NOT the editor LSP — see gotcha)
+uv run python -m tests.eval.harness  # precision/recall over the §10 corpus + self-scan
+```
+
+## Gotchas
+
+- **The editor/live LSP reports false "import could not be resolved" errors** — it is pinned to a
+  stale interpreter, not `.venv`. `uvx pyright` (configured via `[tool.pyright]` venv) is the
+  source of truth and reports 0 errors.
+- macOS `/var` → `/private/var` symlink: don't mix `.resolve()`d paths with unresolved
+  `bundle.root` when computing `relative_to` (bit us in an import test).
+- Verdict floor: any Critical at confidence ≥ Medium ⇒ `DO_NOT_INSTALL` (`scoring.py`).
