@@ -1,0 +1,552 @@
+{
+  "components": {
+    "schemas": {
+      "ArtifactKind": {
+        "description": "The three artifact kinds v1 recognizes, each with its own analysis profile.",
+        "enum": [
+          "skill",
+          "agents",
+          "claude_md"
+        ],
+        "title": "ArtifactKind",
+        "type": "string"
+      },
+      "ArtifactMeta": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ArtifactKind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "ArtifactMeta",
+        "type": "object"
+      },
+      "Body_scan_scan_post": {
+        "properties": {
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Artifact body (mode=text).",
+            "title": "Content"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "contentMediaType": "application/octet-stream",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Uploaded .zip bundle (mode=zip).",
+            "title": "File"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Declared filename for pasted text or a zip.",
+            "title": "Filename"
+          },
+          "kind_hint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KindHint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Artifact-kind hint for pasted text."
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ScanMode",
+            "description": "Which input channel this submission uses."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Remote git URL (mode=git).",
+            "title": "Url"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "Body_scan_scan_post",
+        "type": "object"
+      },
+      "Category": {
+        "enum": [
+          "prompt_injection",
+          "command_execution",
+          "data_exfiltration",
+          "excessive_agency",
+          "secret_exposure",
+          "supply_chain",
+          "context_poisoning",
+          "obfuscation",
+          "trigger_abuse",
+          "tool_poisoning",
+          "manifest_validation"
+        ],
+        "title": "Category",
+        "type": "string"
+      },
+      "Component": {
+        "properties": {
+          "executable": {
+            "default": false,
+            "title": "Executable",
+            "type": "boolean"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ComponentType"
+          }
+        },
+        "required": [
+          "path",
+          "type"
+        ],
+        "title": "Component",
+        "type": "object"
+      },
+      "ComponentType": {
+        "enum": [
+          "manifest",
+          "script",
+          "reference",
+          "asset",
+          "other"
+        ],
+        "title": "ComponentType",
+        "type": "string"
+      },
+      "Confidence": {
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ],
+        "title": "Confidence",
+        "type": "string"
+      },
+      "Finding": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "location": {
+            "$ref": "#/components/schemas/Location"
+          },
+          "raised_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raised By"
+          },
+          "remediation": {
+            "title": "Remediation",
+            "type": "string"
+          },
+          "risk": {
+            "title": "Risk",
+            "type": "string"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "source_layer": {
+            "$ref": "#/components/schemas/SourceLayer"
+          }
+        },
+        "required": [
+          "id",
+          "category",
+          "severity",
+          "confidence",
+          "location",
+          "evidence",
+          "risk",
+          "remediation",
+          "source_layer"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ImportKind": {
+        "description": "Classification of a CLAUDE.md ``@import`` target.",
+        "enum": [
+          "in_tree",
+          "out_of_tree",
+          "remote"
+        ],
+        "title": "ImportKind",
+        "type": "string"
+      },
+      "ImportRef": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ImportKind"
+          },
+          "raw": {
+            "title": "Raw",
+            "type": "string"
+          },
+          "resolved": {
+            "default": false,
+            "title": "Resolved",
+            "type": "boolean"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw",
+          "target",
+          "kind"
+        ],
+        "title": "ImportRef",
+        "type": "object"
+      },
+      "KindHint": {
+        "description": "Optional artifact-kind hint for pasted text (picks the default filename).",
+        "enum": [
+          "skill",
+          "agents",
+          "claude_md"
+        ],
+        "title": "KindHint",
+        "type": "string"
+      },
+      "Location": {
+        "properties": {
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Location",
+        "type": "object"
+      },
+      "ScanMode": {
+        "description": "Which of the three input channels a submission uses (exactly one per request).",
+        "enum": [
+          "text",
+          "zip",
+          "git"
+        ],
+        "title": "ScanMode",
+        "type": "string"
+      },
+      "ScanReport": {
+        "properties": {
+          "artifact_meta": {
+            "$ref": "#/components/schemas/ArtifactMeta"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "imports": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRef"
+            },
+            "title": "Imports",
+            "type": "array"
+          },
+          "judges_used": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Judges Used",
+            "type": "array"
+          },
+          "score": {
+            "default": 0,
+            "title": "Score",
+            "type": "integer"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/Verdict",
+            "default": "CLEAN"
+          }
+        },
+        "required": [
+          "artifact_meta"
+        ],
+        "title": "ScanReport",
+        "type": "object"
+      },
+      "Severity": {
+        "enum": [
+          "critical",
+          "high",
+          "medium",
+          "low",
+          "info"
+        ],
+        "title": "Severity",
+        "type": "string"
+      },
+      "SourceLayer": {
+        "enum": [
+          "static_rules",
+          "manifest",
+          "ast_python",
+          "ast_shell",
+          "taint",
+          "obfuscation",
+          "supply_chain",
+          "judge"
+        ],
+        "title": "SourceLayer",
+        "type": "string"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "Verdict": {
+        "enum": [
+          "CLEAN",
+          "CAUTION",
+          "DO_NOT_INSTALL"
+        ],
+        "title": "Verdict",
+        "type": "string"
+      }
+    }
+  },
+  "info": {
+    "summary": "Static security analysis for AI agent instruction artifacts.",
+    "title": "Skill Analyzer",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/scan": {
+      "post": {
+        "description": "Scan one artifact submission and return a ``ScanReport`` (JSON or SARIF).",
+        "operationId": "scan_scan_post",
+        "parameters": [
+          {
+            "description": "Set to 'sarif' for SARIF 2.1.0.",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Set to 'sarif' for SARIF 2.1.0.",
+              "title": "Format"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_scan_scan_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scan"
+      }
+    }
+  }
+}
