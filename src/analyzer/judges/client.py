@@ -37,6 +37,9 @@ class LiteLLMJudge:
         except ImportError:
             logger.warning("judge %s abstained: litellm is not installed", model)
             return JudgeResult(model, None)
+        # Keep LiteLLM's "Provider List"/feedback banners (printed during internal cost
+        # logging on the response) out of our logs — they're noise, not failures.
+        litellm.suppress_debug_info = True
 
         messages = [
             {"role": "system", "content": request.system},
@@ -46,9 +49,16 @@ class LiteLLMJudge:
             output = parse_judge_output(self._complete(litellm, messages))
             if output is None:
                 messages.append({"role": "user", "content": _REPAIR})
-                output = parse_judge_output(self._complete(litellm, messages))
+                raw = self._complete(litellm, messages)
+                output = parse_judge_output(raw)
                 if output is None:
-                    logger.warning("judge %s abstained: unparseable JSON after repair retry", model)
+                    # Log a short STRUCTURAL prefix (fence/brace), not the body — enough to
+                    # see *why* it won't parse without dumping artifact-derived content.
+                    logger.warning(
+                        "judge %s abstained: unparseable JSON after repair retry (starts %r)",
+                        model,
+                        raw.lstrip()[:32],
+                    )
             return JudgeResult(model, output)
         except Exception as exc:  # noqa: BLE001 — any provider/parse failure => abstain, never false-clean
             # str(exc) carries the provider error (no secrets); truncate to keep logs tidy.

@@ -75,6 +75,26 @@ def test_malformed_judge_output_abstains():
     assert isinstance(good, JudgeOutput)
 
 
+def test_parse_judge_output_tolerates_fenced_and_prose_json():
+    """Real models often wrap JSON in a ```json fence or prose; we must still parse it."""
+    fenced = '```json\n{"findings": []}\n```'
+    assert isinstance(parse_judge_output(fenced), JudgeOutput)
+
+    bare_fence = '```\n{"findings": []}\n```'
+    assert isinstance(parse_judge_output(bare_fence), JudgeOutput)
+
+    prose = 'Here is my analysis:\n{"findings": []}\nLet me know if you need more.'
+    assert isinstance(parse_judge_output(prose), JudgeOutput)
+
+    # a fenced finding survives end-to-end and is attributed
+    fenced_finding = (
+        '```json\n{"findings": [{"category": "prompt_injection", "severity": "high", '
+        '"confidence": "high", "evidence": "x", "risk": "y", "remediation": "z"}]}\n```'
+    )
+    parsed = parse_judge_output(fenced_finding)
+    assert parsed is not None and len(parsed.findings) == 1
+
+
 def test_abstaining_judge_does_not_clear_others():
     """(e)+(f): a jailbroken/broken judge can't suppress another judge's finding."""
     flagged = FakeJudge(JudgeModel("good", "p1"), JudgeOutput(findings=[_finding()]))

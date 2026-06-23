@@ -96,16 +96,44 @@ def build_data_block(content: str, nonce: str) -> tuple[str, bool]:
     return block, spoofed
 
 
+def _json_candidates(raw: str) -> list[str]:
+    """Substrings of a model reply that might be the JSON object, most-literal first.
+
+    Real models (esp. via OpenRouter) often ignore ``response_format`` and wrap the JSON in
+    a ```` ```json ```` fence or a sentence of prose, so try the raw text, any fenced body,
+    and the first ``{`` … last ``}`` slice before giving up.
+    """
+    s = raw.strip()
+    candidates = [s]
+    if "```" in s:
+        parts = s.split("```")
+        if len(parts) >= 2:
+            body = parts[1]
+            if body[:4].lower() == "json":  # ```json language tag
+                body = body[4:]
+            candidates.append(body.strip())
+    start, end = s.find("{"), s.rfind("}")
+    if 0 <= start < end:
+        candidates.append(s[start : end + 1])
+    return candidates
+
+
 def parse_judge_output(raw: str) -> JudgeOutput | None:
-    """Validate a judge's raw response. Returns None (abstain) on any failure."""
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return None
-    try:
-        return JudgeOutput.model_validate(data)
-    except ValidationError:
-        return None
+    """Validate a judge's raw response. Returns None (abstain) on any failure.
+
+    Tolerant of markdown-fenced / prose-wrapped JSON; still additive-only safe — a reply
+    that parses but doesn't match the findings schema abstains (never a clean vote).
+    """
+    for candidate in _json_candidates(raw):
+        try:
+            data = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        try:
+            return JudgeOutput.model_validate(data)
+        except ValidationError:
+            return None
+    return None
 
 
 # --- panel selection ------------------------------------------------------------------------
