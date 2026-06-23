@@ -8,9 +8,16 @@ On any error or unparseable output (after one repair retry) the judge ABSTAINS.
 
 from __future__ import annotations
 
+import logging
+
 from analyzer.config import AnalyzerConfig, JudgeModel
 from analyzer.judges.panel import parse_judge_output
 from analyzer.judges.types import JudgeRequest, JudgeResult
+
+# A judge abstains on failure (additive-only safety), but the abstention must not be
+# silent — emit a log so an operator can see *which* judge failed and why. The app
+# configures the handler; the library only emits (never logs artifact content/secrets).
+logger = logging.getLogger("analyzer.judges")
 
 _REPAIR = (
     "Your previous response was not valid JSON for the required schema. "
@@ -24,24 +31,29 @@ class LiteLLMJudge:
         self.config = config
 
     def evaluate(self, request: JudgeRequest) -> JudgeResult:
+        model = self.model.model_id
         try:
             import litellm
         except ImportError:
-            return JudgeResult(self.model.model_id, None)
+            logger.warning("judge %s abstained: litellm is not installed", model)
+            return JudgeResult(model, None)
 
         messages = [
             {"role": "system", "content": request.system},
             {"role": "user", "content": request.data_block},
         ]
         try:
-            raw = self._complete(litellm, messages)
-            output = parse_judge_output(raw)
+            output = parse_judge_output(self._complete(litellm, messages))
             if output is None:
                 messages.append({"role": "user", "content": _REPAIR})
                 output = parse_judge_output(self._complete(litellm, messages))
-            return JudgeResult(self.model.model_id, output)
-        except Exception:  # noqa: BLE001 — any provider/parse failure => abstain, never false-clean
-            return JudgeResult(self.model.model_id, None)
+                if output is None:
+                    logger.warning("judge %s abstained: unparseable JSON after repair retry", model)
+            return JudgeResult(model, output)
+        except Exception as exc:  # noqa: BLE001 — any provider/parse failure => abstain, never false-clean
+            # str(exc) carries the provider error (no secrets); truncate to keep logs tidy.
+            logger.warning("judge %s failed: %s: %s", model, type(exc).__name__, str(exc)[:300])
+            return JudgeResult(model, None)
 
     def _complete(self, litellm: object, messages: list[dict[str, str]]) -> str:
         resp = litellm.completion(  # type: ignore[attr-defined]

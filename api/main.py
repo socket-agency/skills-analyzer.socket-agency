@@ -32,6 +32,13 @@ from analyzer.render.sarif import to_sarif
 from api.deps import ScanContext, get_scan_context
 from api.schemas import KindHint, OutputFormat, ScanMode
 
+# Configure logging at the app (not in the web-free engine). uvicorn doesn't attach a
+# root handler, so without this the engine's WARN logs (e.g. a judge that failed) and our
+# own INFO lines would be dropped instead of reaching the container's stdout/Dokku logs.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+for _noisy in ("httpx", "httpcore", "litellm", "LiteLLM"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 logger = logging.getLogger("api.scan")
 
 app = FastAPI(

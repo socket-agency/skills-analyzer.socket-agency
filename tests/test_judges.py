@@ -159,8 +159,10 @@ def test_live_judge_forwards_call_timeout_and_disables_retries():
     assert captured["num_retries"] == 0
 
 
-def test_live_judge_abstains_when_provider_errors():
-    """Any provider/timeout error => the judge returns no output (abstains), never a clean vote."""
+def test_live_judge_abstains_and_logs_when_provider_errors(caplog):
+    """A provider/timeout error => the judge abstains AND logs the failure (never silent)."""
+    import logging
+
     from analyzer.judges.client import LiteLLMJudge
     from analyzer.judges.types import JudgeRequest
 
@@ -175,10 +177,15 @@ def test_live_judge_abstains_when_provider_errors():
     saved = sys.modules.get("litellm")
     sys.modules["litellm"] = _BoomLiteLLM()  # type: ignore[assignment]
     try:
-        result = judge.evaluate(JudgeRequest(system="s", data_block="d", nonce="n"))
+        with caplog.at_level(logging.WARNING, logger="analyzer.judges"):
+            result = judge.evaluate(JudgeRequest(system="s", data_block="d", nonce="n"))
     finally:
         if saved is not None:
             sys.modules["litellm"] = saved
         else:
             sys.modules.pop("litellm", None)
     assert result.output is None  # abstained
+    # the failure is surfaced: model id + error type appear in the log
+    assert "openrouter/x/y" in caplog.text
+    assert "failed" in caplog.text
+    assert "TimeoutError" in caplog.text
