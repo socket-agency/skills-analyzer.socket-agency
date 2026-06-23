@@ -25,10 +25,15 @@ class JudgeModel:
 
 # Default registry — distinct providers, with open-source members so a panel can
 # always satisfy the "never 3-of-one-lab, >=1 open model" stratification rule.
+#
+# All five models are routed through OpenRouter (the ``openrouter/`` prefix), so a
+# single OPENROUTER_API_KEY drives the whole live panel. The ``provider`` field keeps
+# the originating lab for stratified sampling; flip the model strings back to native
+# prefixes (e.g. ``anthropic/…``) if you'd rather dispatch to each provider directly.
 DEFAULT_JUDGE_REGISTRY: tuple[JudgeModel, ...] = (
-    JudgeModel("anthropic/claude-sonnet-4-6", "anthropic"),
-    JudgeModel("openai/gpt-5", "openai"),
-    JudgeModel("google/gemini-2.5-pro", "google"),
+    JudgeModel("openrouter/anthropic/claude-sonnet-4.5", "anthropic"),
+    JudgeModel("openrouter/openai/gpt-5", "openai"),
+    JudgeModel("openrouter/google/gemini-2.5-pro", "google"),
     JudgeModel("openrouter/qwen/qwen-2.5-72b-instruct", "openrouter", open_source=True),
     JudgeModel("openrouter/deepseek/deepseek-chat", "openrouter", open_source=True),
 )
